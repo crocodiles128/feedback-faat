@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unifaat: '#0e385b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col justify-between">
+    <main class="flex flex-1 items-center justify-center">
+        <form id="loginForm" class="bg-white border border-gray-200 rounded-lg shadow-md p-8 w-full max-w-sm">
+            <h1 class="text-2xl font-bold text-unifaat mb-6 text-center">Login</h1>
+            <div class="mb-4">
+                <label for="RA" class="block text-unifaat font-medium mb-1">RA</label>
+                <input id="RA" name="RA" type="RA" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-unifaat" />
+            </div>
+            <div class="mb-6">
+                <label for="password" class="block text-unifaat font-medium mb-1">Senha</label>
+                <input id="password" name="password" type="password" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-unifaat" />
+            </div>
+            <button type="submit" class="w-full bg-unifaat text-white font-semibold py-2 rounded hover:bg-unifaat/90 transition">Entrar</button>
+            <div id="loginMsg" class="mt-4 text-center text-red-600 text-sm"></div>
+        </form>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const ra = document.getElementById('RA').value;
+        const password = document.getElementById('password').value;
+        const msgDiv = document.getElementById('loginMsg');
+        msgDiv.textContent = '';
+        const formData = new FormData();
+        formData.append('ra', ra);
+        formData.append('password', password);
+        try {
+            const resp = await fetch('../../API/login.php', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                // Salva dados do usuário no localStorage
+                localStorage.setItem('user', JSON.stringify(data.user));
+                msgDiv.classList.remove('text-red-600');
+                msgDiv.classList.add('text-green-600');
+                msgDiv.textContent = 'Login realizado com sucesso!';
+                setTimeout(() => {
+                    window.location.href = 'home.html';
+                }, 1000);
+            } else {
+                msgDiv.classList.remove('text-green-600');
+                msgDiv.classList.add('text-red-600');
+                msgDiv.textContent = data.mensagem || 'RA ou senha inválidos.';
+            }
+        } catch (err) {
+            msgDiv.classList.remove('text-green-600');
+            msgDiv.classList.add('text-red-600');
+            msgDiv.textContent = 'Erro ao conectar ao servidor.';
+        }
+    });
+    </script>
+</body>
+</html>

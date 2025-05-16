@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Proteção de rota: só permite acesso se estiver logado
+        if (!localStorage.getItem('user')) {
+            window.location.replace('../public/login.html');
+        }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unifaat: '#0e385b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col justify-between">
+    <!-- Navbar -->
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="#" class="hover:underline">Home</a></li>
+            <li><a href="#" class="hover:underline">Perfil</a></li>
+            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+        </ul>
+    </nav>
+    <!-- Conteúdo principal -->
+    <main class="flex flex-1 flex-col items-center justify-center">
+        <div id="pesquisaContainer" class="w-full max-w-2xl mt-8"></div>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('user');
+            window.location.href = '../public/login.html';
+        });
+
+        // NOVO: Carregar detalhes da pesquisa para responder
+        async function carregarPesquisa() {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            const container = document.getElementById('pesquisaContainer');
+            if (!id) {
+                container.innerHTML = '<div class="text-red-600">ID da pesquisa não informado.</div>';
+                return;
+            }
+            // Aqui você pode buscar detalhes e perguntas da pesquisa e montar o formulário de resposta
+            // Exemplo básico:
+            container.innerHTML = '<div class="text-gray-500 text-center">Em breve: formulário para responder pesquisa.</div>';
+        }
+        carregarPesquisa();
+    </script>
+</body>
+</html>

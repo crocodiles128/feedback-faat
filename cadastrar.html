@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastro de Usuário</title>
+</head>
+<body>
+    <h2>Cadastro de Usuário</h2>
+    <form id="cadastroForm">
+        <label for="nome">Nome:</label>
+        <input type="text" id="nome" name="nome" required><br><br>
+
+        <label for="funcao">Função:</label>
+        <select id="funcao" name="funcao" required>
+            <option value="">Selecione uma área</option>
+        </select><br><br>
+
+        <label for="senha">Senha:</label>
+        <input type="password" id="senha" name="senha" required><br><br>
+
+        <button type="submit">Cadastrar</button>
+    </form>
+    <div id="resultado"></div>
+
+    <script>
+    // Preenche o select de áreas
+    async function carregarAreas() {
+        const resp = await fetch('listar_areas.php');
+        const data = await resp.json();
+        const select = document.getElementById('funcao');
+        if (data.sucesso) {
+            data.areas.forEach(area => {
+                const opt = document.createElement('option');
+                opt.value = area.id;
+                opt.textContent = area.name;
+                select.appendChild(opt);
+            });
+        } else {
+            select.innerHTML = '<option value="">Erro ao carregar áreas</option>';
+        }
+    }
+    carregarAreas();
+
+    document.getElementById('cadastroForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        formData.delete('sistema'); // Remove o campo "sistema" do envio
+        const response = await fetch('cadastrar.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        if (data.sucesso) {
+            document.getElementById('resultado').innerHTML = 'Usuário cadastrado com sucesso! RA: ' + data.ra;
+        } else {
+            document.getElementById('resultado').innerHTML = 'Erro ao cadastrar: ' + data.mensagem;
+        }
+    });
+    </script>
+</body>
+</html>

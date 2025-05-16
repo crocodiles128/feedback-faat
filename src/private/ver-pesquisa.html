@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ver Pesquisa - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Proteção de rota: só permite acesso se estiver logado
+        if (!localStorage.getItem('user')) {
+            window.location.replace('../public/login.html');
+        }
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unifaat: '#0e385b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col justify-between">
+    <!-- Navbar -->
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="RH-dash.html" class="hover:underline">Home</a></li>
+            <li><a href="#" class="hover:underline">Perfil</a></li>
+            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+        </ul>
+    </nav>
+    <!-- Conteúdo principal -->
+    <main class="flex flex-1 flex-col items-center justify-start px-4 py-8">
+        <section class="w-full max-w-3xl bg-white border border-unifaat rounded-lg shadow p-6">
+            <button onclick="window.history.back()" class="mb-4 text-unifaat underline text-sm">&larr; Voltar</button>
+            <div id="pesquisa-detalhes">
+                <div class="text-center text-gray-500">Carregando...</div>
+            </div>
+        </section>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+    // Utilitário para pegar parâmetro da URL
+    function getPesquisaId() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id');
+    }
+
+    // Função para iniciar pesquisa
+    async function iniciarPesquisa(id) {
+        if (!confirm('Deseja realmente iniciar esta pesquisa?')) return;
+        try {
+            const resp = await fetch('../../API/iniciar_pesquisa.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `id=${encodeURIComponent(id)}`
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                alert('Pesquisa iniciada com sucesso!');
+                // Recarrega a lista de pesquisas para garantir atualização do status
+                await carregarPesquisa();
+            } else {
+                alert('Erro ao iniciar pesquisa.');
+            }
+        } catch {
+            alert('Erro ao iniciar pesquisa.');
+        }
+    }
+
+    // Função para encerrar pesquisa
+    async function encerrarPesquisa(id) {
+        if (!confirm('Deseja realmente encerrar esta pesquisa?')) return;
+        try {
+            const resp = await fetch('../../API/encerrar_pesquisa.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `id=${encodeURIComponent(id)}`
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                alert('Pesquisa encerrada com sucesso!');
+                // Recarrega a lista de pesquisas para garantir atualização do status
+                await carregarPesquisa();
+            } else {
+                alert('Erro ao encerrar pesquisa.');
+            }
+        } catch {
+            alert('Erro ao encerrar pesquisa.');
+        }
+    }
+
+    // Renderiza detalhes da pesquisa
+    function renderPesquisa(p) {
+        if (!p) {
+            return `<div class="text-red-600">Pesquisa não encontrada.</div>`;
+        }
+
+        // Garante que is_active seja tratado como número
+        const isActive = Number(p.is_active);
+
+        // Determina status pelo campo is_active
+        let statusLabel = '';
+        let statusText = '';
+        let actionBtn = '';
+        if (isActive === 1) {
+            statusLabel = '<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-semibold">Iniciada</span>';
+            statusText = 'Iniciada';
+            actionBtn = `<button class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-800 transition text-sm ml-2" onclick="encerrarPesquisa('${p.id}')">Encerrar</button>`;
+        } else if (isActive === 2) {
+            statusLabel = '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">Finalizada</span>';
+            statusText = 'Finalizada';
+        } else if (isActive === 0) {
+            statusLabel = '<span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-semibold">Não iniciada</span>';
+            statusText = 'Não iniciada';
+            actionBtn = `<button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-800 transition text-sm ml-2" onclick="iniciarPesquisa('${p.id}')">Iniciar</button>`;
+        } else {
+            statusLabel = '<span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-semibold">Desconhecido</span>';
+            statusText = 'Desconhecido';
+        }
+
+        // Remove perguntas duplicadas pelo texto e tipo
+        let perguntasUnicas = [];
+        if (Array.isArray(p.perguntas)) {
+            const seen = new Set();
+            perguntasUnicas = p.perguntas.filter(q => {
+                const key = `${q.text}|${q.tipo}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        return `
+            <h2 class="text-unifaat text-2xl font-bold mb-2">${p.title}</h2>
+            <div class="mb-2 flex flex-wrap items-center gap-4">
+                <span class="text-gray-600 text-sm">Criada em: ${new Date(p.created_at).toLocaleDateString()}</span>
+                ${statusLabel}
+                ${actionBtn}
+            </div>
+            <div class="mb-4">
+                <span class="font-semibold">Status:</span>
+                <span>${statusText}</span>
+            </div>
+            <div class="mb-4">
+                <span class="font-semibold">Perguntas:</span>
+                <ul class="list-disc ml-6 mt-2 space-y-2">
+                    ${perguntasUnicas.length ? perguntasUnicas.map(q => `<li>${q.text} (${q.tipo})</li>`).join('') : '<li class="text-gray-500">Nenhuma pergunta cadastrada.</li>'}
+                </ul>
+            </div>
+            <div class="mb-4">
+                <span class="font-semibold">Total de respostas:</span>
+                <span>${p.respostas ?? 0}</span>
+            </div>
+            ${p.respostas > 0 ? `
+            <div>
+                <a href="relatorio.html?id=${p.id}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-800 transition text-sm">Ver Relatório</a>
+            </div>
+            ` : ''}
+        `;
+    }
+
+    // Carrega detalhes da pesquisa
+    async function carregarPesquisa() {
+        const id = getPesquisaId();
+        const container = document.getElementById('pesquisa-detalhes');
+        if (!id) {
+            container.innerHTML = '<div class="text-red-600">ID da pesquisa não informado.</div>';
+            return;
+        }
+        try {
+            // Busca todas as pesquisas e encontra a correta
+            const resp = await fetch('../../API/listar_pesquisas.php');
+            const data = await resp.json();
+            if (!data.sucesso) throw new Error('Erro ao buscar pesquisas');
+            // Junta todas as pesquisas em um array só
+            const todas = [
+                ...(data.finalizadas || []),
+                ...(data.em_aberto || []),
+                ...(data.nao_iniciadas || [])
+            ];
+            // Corrige: força o status da pesquisa pelo ID retornado mais recente
+            // Busca a pesquisa pelo ID em todas as listas, mas prioriza o status mais atualizado
+            let pesquisa = null;
+            // Procura primeiro em em_aberto (is_active: 1), depois finalizadas (2), depois não iniciadas (0)
+            if (Array.isArray(data.em_aberto)) {
+                pesquisa = data.em_aberto.find(p => String(p.id) === String(id));
+            }
+            if (!pesquisa && Array.isArray(data.finalizadas)) {
+                pesquisa = data.finalizadas.find(p => String(p.id) === String(id));
+            }
+            if (!pesquisa && Array.isArray(data.nao_iniciadas)) {
+                pesquisa = data.nao_iniciadas.find(p => String(p.id) === String(id));
+            }
+            if (!pesquisa) {
+                container.innerHTML = '<div class="text-red-600">Pesquisa não encontrada.</div>';
+                return;
+            }
+            // Busca perguntas da pesquisa (separado, supondo endpoint)
+            let perguntas = [];
+            try {
+                const respPerg = await fetch(`../../API/listar_perguntas.php?id=${pesquisa.id}`);
+                const dataPerg = await respPerg.json();
+                if (dataPerg.sucesso && Array.isArray(dataPerg.perguntas)) {
+                    perguntas = dataPerg.perguntas;
+                }
+            } catch {}
+            pesquisa.perguntas = perguntas;
+            container.innerHTML = renderPesquisa(pesquisa);
+        } catch (e) {
+            container.innerHTML = '<div class="text-red-600">Erro ao carregar pesquisa.</div>';
+        }
+    }
+
+    carregarPesquisa();
+
+    document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('user');
+        window.location.href = '../public/login.html';
+    });
+    </script>
+</body>
+</html>

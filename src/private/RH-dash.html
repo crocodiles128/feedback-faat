@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Proteção de rota: só permite acesso se estiver logado
+        if (!localStorage.getItem('user')) {
+            window.location.replace('../public/login.html');
+        }
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unifaat: '#0e385b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col justify-between">
+    <!-- Navbar -->
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="#" class="hover:underline">Home</a></li>
+            <li><a href="#" class="hover:underline">Perfil</a></li>
+            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+        </ul>
+    </nav>
+    <!-- Conteúdo principal -->
+    <main class="flex flex-1 flex-col items-center justify-start px-4 py-8 space-y-8">
+        <!-- Section: Criar Pesquisa -->
+        <section id="criar-pesquisa-section" class="w-full max-w-4xl bg-white border border-unifaat rounded-lg shadow p-6 flex flex-col md:flex-row items-center justify-between">
+            <div>
+                <h2 class="text-unifaat text-xl font-bold mb-2">Criar nova pesquisa</h2>
+                <p class="text-gray-700 mb-2">Inicie uma nova pesquisa para os colaboradores.</p>
+            </div>
+            <button class="bg-unifaat text-white px-5 py-2 rounded hover:bg-blue-900 transition" onclick="window.location.href='RH-criar-pesquisa.html'">Criar Pesquisa</button>
+        </section>
+        <!-- Section: Relatório de Pesquisas Finalizadas -->
+        <section id="finalizadas-section" class="w-full max-w-4xl bg-white border border-unifaat rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-unifaat text-lg font-bold">Relatório de Pesquisas Finalizadas</h2>
+                <a href="#" class="text-unifaat underline text-sm">Ver apenas finalizadas</a>
+            </div>
+            <div id="finalizadas-list" class="space-y-2"></div>
+        </section>
+        <!-- Section: Pesquisas em Aberto -->
+        <section id="em-aberto-section" class="w-full max-w-4xl bg-white border border-unifaat rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-unifaat text-lg font-bold">Pesquisas em Aberto</h2>
+                <a href="#" class="text-unifaat underline text-sm">Ver apenas em aberto</a>
+            </div>
+            <div id="em-aberto-list" class="space-y-2"></div>
+        </section>
+        <!-- Section: Pesquisas Não Iniciadas -->
+        <section id="nao-iniciadas-section" class="w-full max-w-4xl bg-white border border-unifaat rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-unifaat text-lg font-bold">Pesquisas Criadas e Não Iniciadas</h2>
+                <a href="#" class="text-unifaat underline text-sm">Ver apenas não iniciadas</a>
+            </div>
+            <div id="nao-iniciadas-list" class="space-y-2"></div>
+        </section>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+    // Função utilitária para pegar parâmetro da URL
+    function getTabParam() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('tab');
+    }
+
+    // Função para iniciar pesquisa
+    async function iniciarPesquisa(id) {
+        if (!confirm('Deseja realmente iniciar esta pesquisa?')) return;
+        // Desabilita todos os botões "Iniciar" temporariamente
+        document.querySelectorAll('button[data-iniciar]').forEach(btn => btn.disabled = true);
+        try {
+            const resp = await fetch('../../API/iniciar_pesquisa.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `id=${encodeURIComponent(id)}`
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                alert('Pesquisa iniciada com sucesso!');
+                await carregarPesquisas(); // Aguarda recarregar as listas
+            } else {
+                alert('Erro ao iniciar pesquisa.');
+            }
+        } catch {
+            alert('Erro ao iniciar pesquisa.');
+        } finally {
+            // Reabilita os botões "Iniciar"
+            document.querySelectorAll('button[data-iniciar]').forEach(btn => btn.disabled = false);
+        }
+    }
+
+    // Função para finalizar pesquisa
+    async function finalizarPesquisa(id) {
+        if (!confirm('Deseja realmente finalizar esta pesquisa?')) return;
+        try {
+            const resp = await fetch('../../API/encerrar_pesquisa.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `id=${encodeURIComponent(id)}`
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                alert('Pesquisa finalizada com sucesso!');
+                await carregarPesquisas();
+            } else {
+                alert('Erro ao finalizar pesquisa.');
+            }
+        } catch {
+            alert('Erro ao finalizar pesquisa.');
+        }
+    }
+
+    // Renderiza uma lista de pesquisas
+    function renderPesquisaList(list, containerId) {
+        const container = document.getElementById(containerId);
+        if (!list.length) {
+            container.innerHTML = '<div class="text-gray-500 text-sm">Nenhuma pesquisa encontrada.</div>';
+            return;
+        }
+        container.innerHTML = '';
+        list.forEach(p => {
+            const div = document.createElement('div');
+            div.className = "border border-gray-200 rounded px-4 py-2 flex flex-col md:flex-row md:items-center md:justify-between";
+            div.innerHTML = `
+                <div>
+                    <span class="font-semibold">${p.title}</span>
+                    <span class="ml-2 text-xs text-gray-500">(${new Date(p.created_at).toLocaleDateString()})</span>
+                </div>
+                <div class="mt-2 md:mt-0 flex gap-2">
+                    <button class="bg-unifaat text-white px-3 py-1 rounded text-xs" onclick="window.location.href='ver-pesquisa.html?id=${p.id}'">Ver</button>
+                    ${p.respostas > 0 ? `<button class="bg-blue-600 text-white px-3 py-1 rounded text-xs" onclick="window.location.href='relatorio.html?id=${p.id}'">Relatório</button>` : ''}
+                    ${containerId === 'nao-iniciadas-list' ? `<button class="bg-green-600 text-white px-3 py-1 rounded text-xs" data-iniciar onclick="iniciarPesquisa('${p.id}')">Iniciar</button>` : ''}
+                    ${containerId === 'em-aberto-list' ? `<button class="bg-red-600 text-white px-3 py-1 rounded text-xs" onclick="finalizarPesquisa('${p.id}')">Finalizar</button>` : ''}
+                </div>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    // Busca e exibe as pesquisas conforme o parâmetro da URL
+    async function carregarPesquisas() {
+        const tab = getTabParam();
+        // Mostra/oculta sections conforme tab
+        document.getElementById('finalizadas-section').style.display = (!tab || tab === 'finalizadas') ? '' : 'none';
+        document.getElementById('em-aberto-section').style.display = (!tab || tab === 'em_aberto') ? '' : 'none';
+        document.getElementById('nao-iniciadas-section').style.display = (!tab || tab === 'nao_iniciadas') ? '' : 'none';
+
+        const resp = await fetch('../../API/listar_pesquisas.php');
+        const data = await resp.json();
+        console.log('DEBUG listar_pesquisas.php:', data);
+
+        if (!data.sucesso) {
+            ['finalizadas-list', 'em-aberto-list', 'nao-iniciadas-list'].forEach(id => {
+                document.getElementById(id).innerHTML = '<div class="text-red-600">Erro ao carregar pesquisas.</div>';
+            });
+            return;
+        }
+
+        // Filtra explicitamente pelo campo is_active
+        const todas = [
+            ...(data.finalizadas || []),
+            ...(data.em_aberto || []),
+            ...(data.nao_iniciadas || [])
+        ];
+
+        const finalizadas = todas.filter(p => Number(p.is_active) === 2);
+        const emAberto = todas.filter(p => Number(p.is_active) === 1);
+        const naoIniciadas = todas.filter(p => Number(p.is_active) === 0);
+
+        if (!tab || tab === 'finalizadas') renderPesquisaList(finalizadas, 'finalizadas-list');
+        if (!tab || tab === 'em_aberto') renderPesquisaList(emAberto, 'em-aberto-list');
+        if (!tab || tab === 'nao_iniciadas') renderPesquisaList(naoIniciadas, 'nao-iniciadas-list');
+    }
+
+    // Logout handler
+    document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        // Limpa todas as informações do usuário e sessão
+        localStorage.clear();
+        sessionStorage.clear();
+        // Redireciona e força reload para garantir limpeza de estado
+        window.location.replace('../public/login.html');
+    });
+
+    carregarPesquisas();
+    </script>
+</body>
+</html>

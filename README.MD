@@ -1,0 +1,1 @@
+> **Lembrete:** Falta implementar a parte de exibir e responder pesquisas.

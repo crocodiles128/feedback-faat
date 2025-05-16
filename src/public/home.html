@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        unifaat: '#0e385b'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col justify-between">
+    <!-- Navbar -->
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="#" class="hover:underline">Home</a></li>
+            <li><a href="#" class="hover:underline">Perfil</a></li>
+            <li><a href="#" class="hover:underline">Sair</a></li>
+        </ul>
+    </nav>
+    <!-- Mensagem de Olá no topo direito, abaixo da navbar -->
+    <div class="flex justify-end items-center px-9 mt-6">
+        <span id="welcomeMsg" class="text-unifaat text-lg font-semibold"></span>
+    </div>
+    <!-- Conteúdo principal -->
+    <main class="flex flex-1 flex-col items-center justify-center">
+        <div id="rhCardContainer" class="w-full flex justify-center"></div>
+        <div id="pesquisasAtivasContainer" class="w-full max-w-2xl mt-8"></div>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+    // Exibe nome e área do usuário logado
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user && user.name) {
+        let msg = `Olá, ${user.name}`;
+        if (user.area_name) {
+            msg += ` (${user.area_name})`;
+        }
+        document.getElementById('welcomeMsg').textContent = msg;
+
+        // Busca o card RH de forma segura via backend
+        fetch('../../API/rh_card.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user })
+        })
+        .then(resp => resp.text())
+        .then(html => {
+            if (html.trim()) {
+                document.getElementById('rhCardContainer').innerHTML = html;
+            }
+        });
+
+        // NOVO: Buscar pesquisas ativas para o usuário
+        fetch('../../API/listar_pesquisas_ativas_usuario.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: user.id, area_id: user.area_id })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            const container = document.getElementById('pesquisasAtivasContainer');
+            if (!data.sucesso) {
+                container.innerHTML = '<div class="text-red-600 text-center">Erro ao carregar pesquisas ativas.</div>';
+                return;
+            }
+            if (!data.pesquisas.length) {
+                container.innerHTML = '<div class="text-gray-500 text-center">Nenhuma pesquisa ativa disponível para você no momento.</div>';
+                return;
+            }
+            container.innerHTML = `
+                <h2 class="text-unifaat text-xl font-bold mb-4 text-center">Pesquisas Disponíveis</h2>
+                <div class="space-y-4">
+                    ${data.pesquisas.map(p => `
+                        <div class="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between bg-gray-50">
+                            <div>
+                                <span class="font-semibold">${p.title}</span>
+                                <span class="ml-2 text-xs text-gray-500">(${new Date(p.created_at).toLocaleDateString()})</span>
+                            </div>
+                            <button class="mt-2 md:mt-0 bg-unifaat text-white px-4 py-2 rounded hover:bg-unifaat/90 transition text-sm"
+                                onclick="window.location.href='../private/specific.html?id=${p.id}'">
+                                Responder Pesquisa
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        });
+    } else {
+        // Se não estiver logado, redireciona para login
+        window.location.href = 'login.html';
+    }
+    </script>
+</body>
+</html>
