@@ -114,7 +114,7 @@ CREATE TABLE `responses` (
   `id` int(11) NOT NULL,
   `questionnaire_id` int(11) NOT NULL,
   `question_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
   `area_id` int(11) NOT NULL,
   `answer_text` text DEFAULT NULL,
   `option_id` int(11) DEFAULT NULL,
@@ -145,6 +145,22 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `ra`, `password`, `name`, `area_id`, `role`, `created_at`, `updated_at`) VALUES
 (1, '3817034', '$2y$10$rzzecCQPzfKuqYLhCB8EU.r5QhJOJUya7O1ltqxuiypgOijmv6wFq', 'nome teste', 4, '', '2025-05-16 00:20:33', '2025-05-16 00:20:33'),
 (2, '8643016', '$2y$10$9pRz8MrcyUlFKJvLz9kSnOVShM5zt0zlIfEyiCQPvm.7U0ENLLXTS', 'segundo mano', 2, '', '2025-05-16 00:38:20', '2025-05-16 00:38:20');
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `questionnaire_responses_control`
+--
+
+-- Controle de respostas por usuário (para garantir 1 resposta por pesquisa por usuário)
+CREATE TABLE IF NOT EXISTS `questionnaire_responses_control` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `questionnaire_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `responded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_questionnaire` (`questionnaire_id`,`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Índices para tabelas despejadas
@@ -251,6 +267,12 @@ ALTER TABLE `users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de tabela `questionnaire_responses_control`
+--
+ALTER TABLE `questionnaire_responses_control`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- Restrições para tabelas despejadas
 --
 
@@ -280,7 +302,7 @@ ALTER TABLE `question_options`
 ALTER TABLE `responses`
   ADD CONSTRAINT `responses_ibfk_1` FOREIGN KEY (`questionnaire_id`) REFERENCES `questionnaires` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `responses_ibfk_2` FOREIGN KEY (`question_id`) REFERENCES `questions` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `responses_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `responses_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `responses_ibfk_4` FOREIGN KEY (`area_id`) REFERENCES `areas` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `responses_ibfk_5` FOREIGN KEY (`option_id`) REFERENCES `question_options` (`id`) ON DELETE SET NULL;
 

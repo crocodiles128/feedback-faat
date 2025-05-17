@@ -22,9 +22,9 @@
     <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
         <div class="text-lg font-bold">Unifaat</div>
         <ul class="flex space-x-6">
-            <li><a href="#" class="hover:underline">Home</a></li>
-            <li><a href="#" class="hover:underline">Perfil</a></li>
-            <li><a href="#" class="hover:underline">Sair</a></li>
+            <li><a href="home.html" class="hover:underline">Home</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
         </ul>
     </nav>
     <!-- Mensagem de Olá no topo direito, abaixo da navbar -->
@@ -96,6 +96,17 @@
                     `).join('')}
                 </div>
             `;
+        });
+
+        // Navbar handlers
+        document.getElementById('perfilLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = '../private/general.html';
+        });
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
         });
     } else {
         // Se não estiver logado, redireciona para login

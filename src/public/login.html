@@ -18,6 +18,15 @@
     </script>
 </head>
 <body class="bg-white min-h-screen flex flex-col justify-between">
+    <!-- Navbar -->
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="home.html" class="hover:underline">Home</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
+        </ul>
+    </nav>
     <main class="flex flex-1 items-center justify-center">
         <form id="loginForm" class="bg-white border border-gray-200 rounded-lg shadow-md p-8 w-full max-w-sm">
             <h1 class="text-2xl font-bold text-unifaat mb-6 text-center">Login</h1>
@@ -71,6 +80,17 @@
             msgDiv.classList.add('text-red-600');
             msgDiv.textContent = 'Erro ao conectar ao servidor.';
         }
+    });
+
+    // Navbar handlers
+    document.getElementById('perfilLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = '../private/general.html';
+    });
+    document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
     });
     </script>
 </body>

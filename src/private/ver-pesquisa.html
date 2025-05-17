@@ -28,8 +28,8 @@
         <div class="text-lg font-bold">Unifaat</div>
         <ul class="flex space-x-6">
             <li><a href="RH-dash.html" class="hover:underline">Home</a></li>
-            <li><a href="#" class="hover:underline">Perfil</a></li>
-            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
         </ul>
     </nav>
     <!-- Conteúdo principal -->
@@ -154,8 +154,8 @@
                 </ul>
             </div>
             <div class="mb-4">
-                <span class="font-semibold">Total de respostas:</span>
-                <span>${p.respostas ?? 0}</span>
+                <span class="font-semibold">Total de respondentes:</span>
+                <span id="respondentes-count">${typeof p.respondentes === 'number' ? p.respondentes : 'Carregando...'}</span>
             </div>
             ${p.respostas > 0 ? `
             <div>
@@ -211,6 +211,20 @@
                 }
             } catch {}
             pesquisa.perguntas = perguntas;
+
+            // NOVO: Buscar número de respondentes
+            try {
+                const respResp = await fetch(`../../API/contar_respondentes.php?id=${pesquisa.id}`);
+                const dataResp = await respResp.json();
+                if (dataResp.sucesso && typeof dataResp.respondentes === 'number') {
+                    pesquisa.respondentes = dataResp.respondentes;
+                } else {
+                    pesquisa.respondentes = 0;
+                }
+            } catch {
+                pesquisa.respondentes = 0;
+            }
+
             container.innerHTML = renderPesquisa(pesquisa);
         } catch (e) {
             container.innerHTML = '<div class="text-red-600">Erro ao carregar pesquisa.</div>';
@@ -219,6 +233,10 @@
 
     carregarPesquisa();
 
+    document.getElementById('perfilLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'general.html';
+    });
     document.getElementById('logoutBtn').addEventListener('click', function(e) {
         e.preventDefault();
         localStorage.removeItem('user');

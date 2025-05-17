@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório da Pesquisa - Unifaat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        if (!localStorage.getItem('user')) {
+            window.location.replace('../public/login.html');
+        }
+        tailwind.config = {
+            theme: {
+                extend: { colors: { unifaat: '#0e385b' } }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white min-h-screen flex flex-col">
+    <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
+        <div class="text-lg font-bold">Unifaat</div>
+        <ul class="flex space-x-6">
+            <li><a href="RH-dash.html" class="hover:underline">Dashboard RH</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
+        </ul>
+    </nav>
+    <main class="flex-1 flex flex-col items-center py-8 px-2">
+        <div class="w-full max-w-4xl bg-white border border-unifaat rounded-lg shadow p-6">
+            <button onclick="window.history.back()" class="mb-4 text-unifaat underline text-sm">&larr; Voltar</button>
+            <button id="btnDownload" class="mb-4 ml-4 bg-unifaat text-white px-4 py-2 rounded hover:bg-unifaat/90 transition text-sm">Baixar Relatório</button>
+            <div id="relatorioContainer">
+                <div class="text-center text-gray-500">Carregando relatório...</div>
+            </div>
+        </div>
+    </main>
+    <footer class="bg-unifaat text-white text-center py-3 text-sm mt-8">
+        &copy; 2024 Unifaat. Todos os direitos reservados.
+    </footer>
+    <script>
+    document.getElementById('perfilLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'general.html';
+    });
+    document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        localStorage.removeItem('user');
+        window.location.href = '../public/login.html';
+    });
+
+    let relatorioData = null; // Para uso no download
+
+    async function carregarRelatorio() {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const container = document.getElementById('relatorioContainer');
+        if (!id) {
+            container.innerHTML = '<div class="text-red-600">ID da pesquisa não informado.</div>';
+            return;
+        }
+        container.innerHTML = '<div class="text-gray-500 text-center">Carregando relatório...</div>';
+        try {
+            const resp = await fetch(`../../API/relatorio_pesquisa.php?id=${id}`);
+            const data = await resp.json();
+            relatorioData = { ...data, id }; // Salva para download
+            if (!data.sucesso) {
+                container.innerHTML = `<div class="text-red-600">${data.mensagem || 'Erro ao carregar relatório.'}</div>`;
+                return;
+            }
+            // Header
+            let html = `
+                <h2 class="text-unifaat text-2xl font-bold mb-2">${data.titulo}</h2>
+                <div class="mb-2 flex flex-wrap items-center gap-4">
+                    <span class="text-gray-600 text-sm">Criada em: ${new Date(data.created_at).toLocaleDateString()}</span>
+                    <span class="bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs font-semibold">${data.status}</span>
+                </div>
+                <div class="mb-4">
+                    <span class="font-semibold">Total de respondentes:</span>
+                    <span>${data.total_respondentes}</span>
+                </div>
+                <div class="mb-4">
+                    <span class="font-semibold">Taxa de participação:</span>
+                    <span>
+                        ${
+                            (typeof data.taxa_participacao === 'number')
+                            ? (data.taxa_participacao.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%')
+                            : 'N/A'
+                        }
+                    </span>
+                </div>
+            `;
+
+            // Gráfico setores
+            html += `
+                <div class="mb-8">
+                    <h3 class="font-semibold text-unifaat mb-2">Setores que mais responderam</h3>
+                    <canvas id="setoresChart" height="80"></canvas>
+                </div>
+            `;
+
+            // Gráficos de múltipla escolha (remover duplicatas pelo texto da pergunta)
+            let multiplasUnicas = [];
+            if (data.multiplas && data.multiplas.length) {
+                const seen = new Set();
+                multiplasUnicas = data.multiplas.filter(q => {
+                    if (seen.has(q.text)) return false;
+                    seen.add(q.text);
+                    return true;
+                });
+                if (multiplasUnicas.length) {
+                    html += `<div class="mb-8">
+                        <h3 class="font-semibold text-unifaat mb-2">Respostas de Múltipla Escolha</h3>
+                        <div class="space-y-8">`;
+                    multiplasUnicas.forEach((q, idx) => {
+                        html += `
+                            <div>
+                                <div class="mb-2 font-medium">${q.text}</div>
+                                <canvas id="multiChart${idx}" height="80"></canvas>
+                            </div>
+                        `;
+                    });
+                    html += `</div></div>`;
+                }
+            }
+
+            // Respostas escritas
+            html += `
+                <div>
+                    <h3 class="font-semibold text-unifaat mb-2">Respostas Escritas</h3>
+                    ${data.escritas && data.escritas.length ? `
+                        <ul class="list-disc ml-6 space-y-2">
+                            ${data.escritas.map(r => `<li><span class="text-gray-700">${r.texto}</span> <span class="text-xs text-gray-400">(${r.area})</span></li>`).join('')}
+                        </ul>
+                    ` : '<div class="text-gray-500">Nenhuma resposta escrita enviada.</div>'}
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // Gráfico setores
+            if (data.setores && Object.keys(data.setores).length) {
+                const ctx = document.getElementById('setoresChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(data.setores),
+                        datasets: [{
+                            label: 'Respostas',
+                            data: Object.values(data.setores),
+                            backgroundColor: '#0e385b'
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, precision:0 } }
+                    }
+                });
+            }
+
+            // Gráficos múltipla escolha (apenas perguntas únicas)
+            if (multiplasUnicas.length) {
+                multiplasUnicas.forEach((q, idx) => {
+                    const ctx = document.getElementById(`multiChart${idx}`).getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: q.opcoes.map(o => o.texto),
+                            datasets: [{
+                                label: 'Respostas',
+                                data: q.opcoes.map(o => o.qtd),
+                                backgroundColor: '#0e385b'
+                            }]
+                        },
+                        options: {
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, precision:0 } }
+                        }
+                    });
+                });
+            }
+        } catch (e) {
+            container.innerHTML = '<div class="text-red-600">Erro ao carregar relatório.</div>';
+        }
+    }
+    carregarRelatorio();
+
+    // Função para gerar texto do relatório
+    function gerarTextoRelatorio(data) {
+        if (!data || !data.sucesso) return 'Relatório indisponível.';
+        let txt = '';
+        txt += `Relatório de pesquisa [${data.id}] ${data.titulo}\n`;
+        txt += `Status: ${data.status}\n`;
+        txt += `Criada em: ${new Date(data.created_at).toLocaleDateString()}\n`;
+        txt += `Total de respondentes: ${data.total_respondentes}\n`;
+        txt += `Taxa de participação: ${
+            (typeof data.taxa_participacao === 'number')
+            ? (data.taxa_participacao.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%')
+            : 'N/A'
+        }\n\n`;
+
+        txt += `Setores que mais responderam:\n`;
+        if (data.setores && Object.keys(data.setores).length) {
+            Object.entries(data.setores).forEach(([area, qtd]) => {
+                txt += `- ${area}: ${qtd}\n`;
+            });
+        } else {
+            txt += 'Nenhum setor respondeu.\n';
+        }
+        txt += '\n';
+
+        // Perguntas de múltipla escolha (únicas)
+        if (data.multiplas && data.multiplas.length) {
+            const seen = new Set();
+            const multiplasUnicas = data.multiplas.filter(q => {
+                if (seen.has(q.text)) return false;
+                seen.add(q.text);
+                return true;
+            });
+            if (multiplasUnicas.length) {
+                txt += 'Respostas de Múltipla Escolha:\n';
+                multiplasUnicas.forEach(q => {
+                    txt += `Pergunta: ${q.text}\n`;
+                    q.opcoes.forEach(o => {
+                        txt += `   - ${o.texto}: ${o.qtd}\n`;
+                    });
+                });
+                txt += '\n';
+            }
+        }
+
+        // Respostas escritas
+        txt += 'Respostas Escritas:\n';
+        if (data.escritas && data.escritas.length) {
+            data.escritas.forEach(r => {
+                txt += `- (${r.area}) ${r.texto}\n`;
+            });
+        } else {
+            txt += 'Nenhuma resposta escrita enviada.\n';
+        }
+        return txt;
+    }
+
+    // Caminho do logo (ajuste se necessário)
+    const LOGO_PATH = '../../faat-logo.png';
+
+    // Função para carregar imagem como base64
+    function carregarLogoBase64(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    // Função para gerar PDF do relatório com gráficos e logo
+    async function gerarPDFRelatorio(data) {
+        if (!data || !data.sucesso) return;
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        let y = 15;
+        const left = 15;
+        const maxWidth = 180;
+
+        // Adiciona logo e nome da faculdade
+        try {
+            const logoBase64 = await carregarLogoBase64(LOGO_PATH);
+            doc.addImage(logoBase64, 'PNG', left, y - 5, 25, 15);
+        } catch {}
+        doc.setFontSize(18);
+        doc.setFont(undefined, 'bold');
+        doc.text('UniFaat', left + 30, y + 5);
+        doc.setFont(undefined, 'normal');
+        y += 18;
+
+        // Título
+        doc.setFontSize(16);
+        doc.text(`Relatório de pesquisa [${data.id}] ${data.titulo}`, left, y, {maxWidth});
+        y += 10;
+
+        doc.setFontSize(11);
+        doc.text(`Status: ${data.status}`, left, y); y += 7;
+        doc.text(`Criada em: ${new Date(data.created_at).toLocaleDateString()}`, left, y); y += 7;
+        doc.text(`Total de respondentes: ${data.total_respondentes}`, left, y); y += 7;
+        doc.text(`Taxa de participação: ${
+            (typeof data.taxa_participacao === 'number')
+            ? (data.taxa_participacao.toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%')
+            : 'N/A'
+        }`, left, y); y += 10;
+
+        // Setores
+        doc.setFont(undefined, 'bold');
+        doc.text('Setores que mais responderam:', left, y); y += 7;
+        doc.setFont(undefined, 'normal');
+        if (data.setores && Object.keys(data.setores).length) {
+            Object.entries(data.setores).forEach(([area, qtd]) => {
+                doc.text(`- ${area}: ${qtd}`, left, y); y += 6;
+            });
+        } else {
+            doc.text('Nenhum setor respondeu.', left, y); y += 6;
+        }
+        y += 4;
+
+        // Adiciona gráfico de setores (canvas)
+        const setoresCanvas = document.getElementById('setoresChart');
+        if (setoresCanvas) {
+            const setoresImg = await html2canvas(setoresCanvas, {backgroundColor: null}).then(canvas => canvas.toDataURL('image/png'));
+            if (y > 230) { doc.addPage(); y = 15; }
+            doc.addImage(setoresImg, 'PNG', left, y, 180, 40);
+            y += 45;
+        }
+
+        // Perguntas de múltipla escolha (únicas)
+        if (data.multiplas && data.multiplas.length) {
+            const seen = new Set();
+            const multiplasUnicas = data.multiplas.filter(q => {
+                if (seen.has(q.text)) return false;
+                seen.add(q.text);
+                return true;
+            });
+            if (multiplasUnicas.length) {
+                doc.setFont(undefined, 'bold');
+                doc.text('Respostas de Múltipla Escolha:', left, y); y += 7;
+                doc.setFont(undefined, 'normal');
+                for (let idx = 0; idx < multiplasUnicas.length; idx++) {
+                    const q = multiplasUnicas[idx];
+                    doc.text(`Pergunta: ${q.text}`, left, y); y += 6;
+                    q.opcoes.forEach(o => {
+                        doc.text(`   - ${o.texto}: ${o.qtd}`, left, y); y += 6;
+                    });
+                    // Adiciona gráfico da pergunta (canvas)
+                    const chartCanvas = document.getElementById(`multiChart${idx}`);
+                    if (chartCanvas) {
+                        const chartImg = await html2canvas(chartCanvas, {backgroundColor: null}).then(canvas => canvas.toDataURL('image/png'));
+                        if (y > 230) { doc.addPage(); y = 15; }
+                        doc.addImage(chartImg, 'PNG', left, y, 180, 40);
+                        y += 45;
+                    }
+                    y += 2;
+                    if (y > 270) { doc.addPage(); y = 15; }
+                }
+                y += 2;
+            }
+        }
+
+        // Respostas escritas
+        doc.setFont(undefined, 'bold');
+        doc.text('Respostas Escritas:', left, y); y += 7;
+        doc.setFont(undefined, 'normal');
+        if (data.escritas && data.escritas.length) {
+            data.escritas.forEach(r => {
+                let texto = `- (${r.area}) ${r.texto}`;
+                let split = doc.splitTextToSize(texto, maxWidth);
+                doc.text(split, left, y);
+                y += split.length * 6;
+                if (y > 270) { doc.addPage(); y = 15; }
+            });
+        } else {
+            doc.text('Nenhuma resposta escrita enviada.', left, y); y += 6;
+        }
+
+        // Nome do arquivo
+        const nome = `Relatorio de pesquisa [${data.id}] ${data.titulo}`.replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
+        doc.save(nome);
+    }
+
+    // Handler do botão de download
+    document.getElementById('btnDownload').addEventListener('click', function() {
+        if (!relatorioData) return;
+        gerarPDFRelatorio(relatorioData);
+    });
+    </script>
+</body>
+</html>

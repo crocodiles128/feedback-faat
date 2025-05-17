@@ -27,9 +27,9 @@
     <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
         <div class="text-lg font-bold">Unifaat</div>
         <ul class="flex space-x-6">
-            <li><a href="#" class="hover:underline">Home</a></li>
-            <li><a href="#" class="hover:underline">Perfil</a></li>
-            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+            <li><a href="../public/home.html" class="hover:underline">Home</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
         </ul>
     </nav>
     <!-- Conteúdo principal -->
@@ -186,13 +186,15 @@
         if (!tab || tab === 'nao_iniciadas') renderPesquisaList(naoIniciadas, 'nao-iniciadas-list');
     }
 
-    // Logout handler
+    // Navbar handlers
+    document.getElementById('perfilLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'general.html';
+    });
     document.getElementById('logoutBtn').addEventListener('click', function(e) {
         e.preventDefault();
-        // Limpa todas as informações do usuário e sessão
         localStorage.clear();
         sessionStorage.clear();
-        // Redireciona e força reload para garantir limpeza de estado
         window.location.replace('../public/login.html');
     });
 

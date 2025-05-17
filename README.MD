@@ -1,1 +1,1 @@
-> **Lembrete:** Falta implementar a parte de exibir e responder pesquisas.
+> **Lembrete:** só falta a parte do "perfil"

@@ -21,8 +21,8 @@
         <div class="text-lg font-bold">Unifaat</div>
         <ul class="flex space-x-6">
             <li><a href="RH-dash.html" class="hover:underline">Dashboard RH</a></li>
-            <li><a href="#" class="hover:underline">Perfil</a></li>
-            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
         </ul>
     </nav>
     <main class="flex-1 flex flex-col items-center py-8 px-2">
@@ -226,6 +226,10 @@
         }
     };
 
+    document.getElementById('perfilLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'general.html';
+    });
     document.getElementById('logoutBtn').addEventListener('click', function(e) {
         e.preventDefault();
         localStorage.removeItem('user');

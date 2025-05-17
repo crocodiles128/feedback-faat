@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - Unifaat</title>
+    <title>Responder Pesquisa - Unifaat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         // Proteção de rota: só permite acesso se estiver logado
@@ -26,9 +26,9 @@
     <nav class="bg-unifaat text-white px-6 py-4 flex items-center justify-between shadow">
         <div class="text-lg font-bold">Unifaat</div>
         <ul class="flex space-x-6">
-            <li><a href="#" class="hover:underline">Home</a></li>
-            <li><a href="#" class="hover:underline">Perfil</a></li>
-            <li><a href="#" class="hover:underline" id="logoutBtn">Sair</a></li>
+            <li><a href="../public/home.html" class="hover:underline">Home</a></li>
+            <li><a href="#" id="perfilLink" class="hover:underline">Perfil</a></li>
+            <li><a href="#" id="logoutBtn" class="hover:underline">Sair</a></li>
         </ul>
     </nav>
     <!-- Conteúdo principal -->
@@ -39,13 +39,17 @@
         &copy; 2024 Unifaat. Todos os direitos reservados.
     </footer>
     <script>
+        document.getElementById('perfilLink').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = 'general.html';
+        });
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
             e.preventDefault();
             localStorage.removeItem('user');
             window.location.href = '../public/login.html';
         });
 
-        // NOVO: Carregar detalhes da pesquisa para responder
+        // Carregar detalhes da pesquisa e montar formulário
         async function carregarPesquisa() {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
@@ -54,9 +58,142 @@
                 container.innerHTML = '<div class="text-red-600">ID da pesquisa não informado.</div>';
                 return;
             }
-            // Aqui você pode buscar detalhes e perguntas da pesquisa e montar o formulário de resposta
-            // Exemplo básico:
-            container.innerHTML = '<div class="text-gray-500 text-center">Em breve: formulário para responder pesquisa.</div>';
+            container.innerHTML = '<div class="text-gray-500 text-center">Carregando pesquisa...</div>';
+            try {
+                // Busca detalhes da pesquisa
+                const respPesquisa = await fetch(`../../API/listar_pesquisas.php`);
+                const dataPesquisa = await respPesquisa.json();
+                if (!dataPesquisa.sucesso) throw new Error('Erro ao buscar pesquisa');
+                // Procura a pesquisa pelo ID
+                let pesquisa = null;
+                const todas = [
+                    ...(dataPesquisa.finalizadas || []),
+                    ...(dataPesquisa.em_aberto || []),
+                    ...(dataPesquisa.nao_iniciadas || [])
+                ];
+                pesquisa = todas.find(p => String(p.id) === String(id));
+                if (!pesquisa) {
+                    container.innerHTML = '<div class="text-red-600">Pesquisa não encontrada.</div>';
+                    return;
+                }
+                // Busca perguntas
+                const respPerg = await fetch(`../../API/listar_perguntas.php?id=${id}`);
+                const dataPerg = await respPerg.json();
+                if (!dataPerg.sucesso || !Array.isArray(dataPerg.perguntas)) {
+                    container.innerHTML = '<div class="text-red-600">Erro ao carregar perguntas da pesquisa.</div>';
+                    return;
+                }
+                const perguntas = dataPerg.perguntas;
+                // Remove perguntas duplicadas pelo texto e tipo
+                const perguntasUnicas = [];
+                const seen = new Set();
+                for (const p of perguntas) {
+                    const key = `${p.text}|${p.tipo}`;
+                    if (!seen.has(key)) {
+                        perguntasUnicas.push(p);
+                        seen.add(key);
+                    }
+                }
+                if (!perguntasUnicas.length) {
+                    container.innerHTML = '<div class="text-gray-500">Esta pesquisa não possui perguntas cadastradas.</div>';
+                    return;
+                }
+                // Monta formulário
+                container.innerHTML = `
+                    <h2 class="text-unifaat text-2xl font-bold mb-4 text-center">${pesquisa.title}</h2>
+                    <form id="formResposta" class="space-y-6">
+                        ${perguntasUnicas.map((p, idx) => {
+                            if (p.tipo === 'escrita') {
+                                return `
+                                    <div>
+                                        <label class="block font-semibold mb-1" for="pergunta_${p.id}">${idx+1}. ${p.text}</label>
+                                        <textarea id="pergunta_${p.id}" name="pergunta_${p.id}" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-unifaat" required></textarea>
+                                    </div>
+                                `;
+                            } else if (p.tipo === 'multipla') {
+                                return `
+                                    <div>
+                                        <label class="block font-semibold mb-1">${idx+1}. ${p.text}</label>
+                                        <div class="flex flex-col gap-2 ml-2">
+                                            ${(p.opcoes||[]).map(opt => `
+                                                <label class="flex items-center gap-2">
+                                                    <input type="radio" name="pergunta_${p.id}" value="${opt.id}" required>
+                                                    <span>${opt.option_text}</span>
+                                                </label>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                return `<div class="text-red-600">Tipo de pergunta desconhecido.</div>`;
+                            }
+                        }).join('')}
+                        <div id="msgResposta" class="text-center text-sm"></div>
+                        <button type="submit" class="w-full bg-unifaat text-white font-semibold py-2 rounded hover:bg-unifaat/90 transition">Enviar Respostas</button>
+                    </form>
+                `;
+                // Handler de envio
+                document.getElementById('formResposta').onsubmit = async function(e) {
+                    e.preventDefault();
+                    const msg = document.getElementById('msgResposta');
+                    msg.textContent = '';
+                    msg.className = 'text-center text-sm';
+                    // Monta respostas
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    const respostas = perguntasUnicas.map(p => {
+                        if (p.tipo === 'escrita') {
+                            return {
+                                question_id: p.id,
+                                tipo: 'escrita',
+                                answer_text: document.getElementById(`pergunta_${p.id}`).value.trim()
+                            };
+                        } else if (p.tipo === 'multipla') {
+                            const opt = document.querySelector(`input[name="pergunta_${p.id}"]:checked`);
+                            return {
+                                question_id: p.id,
+                                tipo: 'multipla',
+                                option_id: opt ? opt.value : null
+                            };
+                        }
+                        return null;
+                    });
+                    // Validação básica
+                    if (respostas.some(r => r === null || (r.tipo === 'escrita' && !r.answer_text) || (r.tipo === 'multipla' && !r.option_id))) {
+                        msg.textContent = 'Responda todas as perguntas.';
+                        msg.className = 'text-red-600 text-center text-sm';
+                        return;
+                    }
+                    // Envia para backend (endpoint a ser criado: responder_pesquisa.php)
+                    msg.textContent = 'Enviando respostas...';
+                    msg.className = 'text-unifaat text-center text-sm';
+                    try {
+                        const resp = await fetch('../../API/responder_pesquisa.php', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                questionnaire_id: id,
+                                user_id: user.id,
+                                area_id: user.area_id,
+                                respostas
+                            })
+                        });
+                        const data = await resp.json();
+                        if (data.sucesso) {
+                            msg.textContent = 'Respostas enviadas com sucesso!';
+                            msg.className = 'text-green-600 text-center text-sm';
+                            setTimeout(() => window.location.href = '../public/home.html', 1200);
+                        } else {
+                            msg.textContent = data.mensagem || 'Erro ao enviar respostas.';
+                            msg.className = 'text-red-600 text-center text-sm';
+                        }
+                    } catch {
+                        msg.textContent = 'Erro ao conectar ao servidor.';
+                        msg.className = 'text-red-600 text-center text-sm';
+                    }
+                };
+            } catch (e) {
+                container.innerHTML = '<div class="text-red-600">Erro ao carregar pesquisa.</div>';
+            }
         }
         carregarPesquisa();
     </script>
